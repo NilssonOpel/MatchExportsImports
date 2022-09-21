@@ -12,15 +12,24 @@ import textwrap
 
 
 MY_NAME = os.path.basename(__file__)
-MAGIC_PATH = 'C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.33.31629\\bin\\Hostx64\\x64'
+DEFAULT_EXP_OUTPUT='exports.json'
+DEFAULT_IMP_OUTPUT='imports.json'
+DEFAULT_UNREF_OUTPUT='unreferenced_functions.json'
+
 
 DESCRIPTION = f"""
-Take the output (exports.json and imports.json) and find the unreferenced
-exports
+Take the output from get_exports_imports.py (exports.json and imports.json) and
+save unreferenced exported functions as {DEFAULT_UNREF_OUTPUT}
 """
 USAGE_EXAMPLE = f"""
 Example:
-> {MY_NAME} -t ../data
+For just ASpecificDLL.dll
+> get_exports_imports.py -t ..\\..\\refdefs\\apps -u ASpecificDLL.dll
+> {MY_NAME} -t .
+or for them all
+> get_exports_imports.py -t ..\\..\\refdefs\\apps
+> {MY_NAME} -t .
+
 """
 
 #-------------------------------------------------------------------------------
@@ -36,13 +45,9 @@ def parse_arguments():
 
     add('-q', '--quiet', action='store_true',
         help='be more quiet')
-    add('-s', '--studio_dir', metavar='VS2022',
-        default=MAGIC_PATH,
-        help='Where your dumpbin.exe is located')
-    add('-t', '--target_dir', metavar='bin-dir',
+    add('-t', '--target_dir', metavar='DIR',
         default=os.getcwd(),
         help='root path to exports.json and imports.json of interest')
-
     add('-v', '--verbose', action='store_true',
         help='be more verbose')
 
@@ -112,31 +117,32 @@ def store_json_data(file, data):
         json.dump(data, fp, indent=2)
 
 #-------------------------------------------------------------------------------
-def find_references_to(defining_exe, defined_function, import_references,
+def find_references_to(defining_exe, import_references,
     pruning_list_of_defines, options):
+
     for importing_exe in import_references.keys():
         if options.verbose:
-            print(f'{importing_exe = }')
+            print(f'  - Check if {importing_exe} has imports from ' +
+                f'{defining_exe}')
         imported_exes = import_references[importing_exe]
         if not imported_exes:
             if options.verbose:
-                print(f'  =no imports=')
+                print(f'    - had no imported DLL:s')
             continue
         if not defining_exe in imported_exes:
             if options.verbose:
-                print(f'  {defining_exe} not imported by {importing_exe}')
+                print(f'    - {defining_exe} not imported by {importing_exe}')
             continue
         if options.verbose:
-            print(f'  {defining_exe} imported by {importing_exe}')
+            print(f'    - {defining_exe} imported by {importing_exe}')
 
         referenced_functions = imported_exes[defining_exe]
-        for defined_function in referenced_functions:
-            if defined_function in pruning_list_of_defines:
-                pruning_list_of_defines.remove(defined_function)
-                print(f'  Ref: {defined_function} - first')
-            # Here is fall-through, idiot!
-            if options.verbose:
-                print(f'  Ref: {defined_function} - multiple')
+        for current_function in referenced_functions:
+            if current_function in pruning_list_of_defines:
+                pruning_list_of_defines.remove(current_function)
+                if options.verbose:
+                    print(f'      - Pruning: {current_function} - first occurence')
+                    continue
 
     return pruning_list_of_defines
 
@@ -153,35 +159,34 @@ def main():
         print(f'No import file found as {import_file}')
         return 3
 
+    print('Collecting the exports')
     exports_defined = load_json_data(export_file)
     import_references = load_json_data(import_file)
-    print('Collecting the exports')
 
     results = {}
+    print('Pruning out the used exported functions')
     for exporting_exe in exports_defined.keys():
         if options.verbose:
-            print(f'{exporting_exe = }')
+            print(f'Pruning exported functions from {exporting_exe}')
         defined_functions = exports_defined[exporting_exe]
         if not defined_functions:
             if options.verbose:
-                print(f'  =nothing=')
+                print(f'  - had no exported functions')
             continue
 
         # Make a copy for pruning out all references
         pruning_list_of_defined_functions = defined_functions
-        for defined_function in defined_functions:
-            if options.verbose:
-                print(f'  {defined_function = }')
-            exporting_exe_key = os.path.basename(exporting_exe)
-            pruning_list_of_defined_functions = find_references_to(
-                exporting_exe_key, defined_function, import_references,
-                pruning_list_of_defined_functions, options)
+        exporting_exe_key = os.path.basename(exporting_exe)
+        pruning_list_of_defined_functions = find_references_to(
+            exporting_exe_key, import_references,
+            pruning_list_of_defined_functions, options)
 
-        results[exporting_exe] = pruning_list_of_defined_functions
         # What is left in pruning_list_of_defined_functions are unreferenced
+        # functions exported by the exporting_exe
+        results[exporting_exe] = pruning_list_of_defined_functions
 
-    store_json_data('unreferenced_functions.json', results)
-    print('  Saved as unreferenced_functions.json')
+    store_json_data(DEFAULT_UNREF_OUTPUT, results)
+    print(f'  Saved as {DEFAULT_UNREF_OUTPUT}')
 
     return 0
 

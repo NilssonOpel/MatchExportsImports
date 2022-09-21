@@ -13,10 +13,13 @@ import textwrap
 
 MY_NAME = os.path.basename(__file__)
 MAGIC_PATH = 'C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.33.31629\\bin\\Hostx64\\x64'
+DEFAULT_EXP_OUTPUT='exports.json'
+DEFAULT_IMP_OUTPUT='imports.json'
 
 DESCRIPTION = f"""
 Index the executable files in the --target_dir, taking the information from
-    dumpbin /exports and /imports to find unused functions
+    dumpbin /exports and /imports and gather the data into
+    {DEFAULT_EXP_OUTPUT} and {DEFAULT_IMP_OUTPUT}
   --studio_dir may for example be
         {MAGIC_PATH}
 """
@@ -294,8 +297,8 @@ def main():
     if not len(exports):
         print(f'Got no exports - giving up')
         return 3
-    store_json_data('exports.json', exports)
-    print('  Saved as exports.json')
+    store_json_data(DEFAULT_EXP_OUTPUT, exports)
+    print(f'  Saved as {DEFAULT_EXP_OUTPUT}')
 
     # The go another round to insert the imports
     imports = {}
@@ -307,8 +310,8 @@ def main():
         imports_from_dlls = get_imports(exe, imports, interesting_dll_names, options)
         imports[os.path.basename(exe)] = imports_from_dlls
 
-    store_json_data('imports.json', imports)
-    print('  Saved as imports.json')
+    store_json_data(DEFAULT_IMP_OUTPUT, imports)
+    print(f'  Saved as {DEFAULT_IMP_OUTPUT}')
     return 0
 
 #-------------------------------------------------------------------------------
