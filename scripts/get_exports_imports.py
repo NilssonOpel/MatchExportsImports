@@ -23,6 +23,7 @@ Index the executable files in the --target_dir, taking the information from
 USAGE_EXAMPLE = f"""
 Example:
 > {MY_NAME} -t ../data
+> {MY_NAME} -t ../data -u just_this.dll
 """
 
 #-------------------------------------------------------------------------------
@@ -46,6 +47,8 @@ def parse_arguments():
     add('-t', '--target_dir', metavar='bin-dir',
         required=True,
         help='root path to check (recursively)')
+    add('-u', '--unly_one', metavar='dll_under_test.dll',
+        help='exports from this exe only')
 
     add('-v', '--verbose', action='store_true',
         help='be more verbose')
@@ -280,10 +283,17 @@ def main():
     exports = {}
     print('Collecting the exports')
     for exe in exes:
+        if options.unly_one and os.path.basename(exe) != options.unly_one:
+            if options.verbose:
+                print(f'Skipping {exe} because of -u {options.unly_one}')
+            continue
         if options.verbose:
             print(exe)
         exports[exe] = get_exports(exe, options)
 
+    if not len(exports):
+        print(f'Got no exports - giving up')
+        return 3
     store_json_data('exports.json', exports)
     print('  Saved as exports.json')
 
@@ -304,5 +314,4 @@ def main():
 #-------------------------------------------------------------------------------
 if __name__ == "__main__":
     sys.exit(main())
-    root = options.target_dir
 

@@ -124,14 +124,17 @@ def find_references_to(defining_exe, defined_function, import_references,
             continue
         if not defining_exe in imported_exes:
             if options.verbose:
-                print(f'  {defining_exe} is not imported by {importing_exe}')
+                print(f'  {defining_exe} not imported by {importing_exe}')
             continue
+        if options.verbose:
+            print(f'  {defining_exe} imported by {importing_exe}')
 
         referenced_functions = imported_exes[defining_exe]
-        if defined_function in referenced_functions:
+        for defined_function in referenced_functions:
             if defined_function in pruning_list_of_defines:
                 pruning_list_of_defines.remove(defined_function)
                 print(f'  Ref: {defined_function} - first')
+            # Here is fall-through, idiot!
             if options.verbose:
                 print(f'  Ref: {defined_function} - multiple')
 
@@ -144,10 +147,10 @@ def main():
     export_file = os.path.join(root, 'exports.json')
     import_file = os.path.join(root, 'imports.json')
     if not os.path.exists(export_file):
-        print(f'No export file found as {exports_file}')
+        print(f'No export file found as {export_file}')
         return 3
     if not os.path.exists(import_file):
-        print(f'No import file found as {imports_file}')
+        print(f'No import file found as {import_file}')
         return 3
 
     exports_defined = load_json_data(export_file)
@@ -168,7 +171,7 @@ def main():
         pruning_list_of_defined_functions = defined_functions
         for defined_function in defined_functions:
             if options.verbose:
-                print(f'  {defined_function}')
+                print(f'  {defined_function = }')
             exporting_exe_key = os.path.basename(exporting_exe)
             pruning_list_of_defined_functions = find_references_to(
                 exporting_exe_key, defined_function, import_references,
