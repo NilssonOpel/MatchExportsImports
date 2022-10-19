@@ -38,12 +38,8 @@ def parse_arguments():
         epilog=textwrap.dedent(USAGE_EXAMPLE)
     )
     add = parser.add_argument
-    add('-b', '--backup', action='store_true',
-        help='make a backup of the .pdb file as <path>.orig')
     add('-d', '--debug_level', type=int, default=0, help='set debug level')
 
-    add('-q', '--quiet', action='store_true',
-        help='be more quiet')
     add('-s', '--studio_dir', metavar='VS2022',
         default=MAGIC_PATH,
         help='Where your dumpbin.exe is located')
@@ -53,6 +49,8 @@ def parse_arguments():
     add('-u', '--unly_one', metavar='dll_under_test.dll',
         help='exports from this exe only')
 
+    add('-q', '--quiet', action='store_true',
+        help='be more quiet')
     add('-v', '--verbose', action='store_true',
         help='be more verbose')
 
@@ -138,8 +136,8 @@ def parse_out_the_exports(the_exe, the_input, options):
     curr_line = curr_line + 2
     if curr_line >= no_of_lines:
         if options.verbose:
-            print(f'Found no exports in {the_exe}')
-        return
+            print(f'  Found no exports in {the_exe}')
+        return list_of_functions
 
     while curr_line < no_of_lines:
         line = the_input[curr_line]
@@ -154,14 +152,28 @@ def parse_out_the_exports(the_exe, the_input, options):
     return list_of_functions
 
 #-------------------------------------------------------------------------------
-def get_exports(path_of_exe, options):
+def get_export(path_of_exe, options):
     commando = f'{options.dumpbin} /exports {path_of_exe}'
     if options.verbose:
-        print(commando)
+        print('  ' + commando)
     output = run_process(commando, True)
     exported_functions = parse_out_the_exports(path_of_exe, output.splitlines(),
         options)
     return exported_functions
+
+#-------------------------------------------------------------------------------
+def get_exports(executables, options):
+    exports = {}
+    for exe in executables:
+        if options.unly_one and os.path.basename(exe) != options.unly_one:
+            if options.verbose:
+                print(f'Skipping {exe} because of -u {options.unly_one}')
+            continue
+        if options.verbose:
+            print(exe)
+        exports[exe] = get_export(exe, options)
+
+    return exports
 
 #-------------------------------------------------------------------------------
 def get_next_imported_dll(the_input, curr_line, no_of_lines):
@@ -194,12 +206,9 @@ def parse_out_the_imports(the_exe, interesting_exes, the_input, options):
     curr_line = curr_line + 2
     if curr_line >= no_of_lines:
         if options.verbose:
-            print(f'Found no start of imports in {the_exe}')
+            print(f'  Found no start of imports in {the_exe}')
         return
 
-
-    if options.verbose:
-        print(the_exe)
     # Now get the name(s) of the DLL(s) that we import from
     while curr_line < no_of_lines:
         line = the_input[curr_line]
@@ -246,14 +255,28 @@ def parse_out_the_imports(the_exe, interesting_exes, the_input, options):
     return dict_of_imports
 
 #-------------------------------------------------------------------------------
-def get_imports(path_of_exe, imports, interesting_exes, options):
+def get_import(path_of_exe, imports, interesting_exes, options):
     commando = f'"{options.dumpbin}" /imports {path_of_exe}'
     if options.verbose:
-        print(commando)
+        print('  ' + commando)
     output = run_process(commando, True)
     imported_from_dlls = parse_out_the_imports(path_of_exe, interesting_exes,
         output.splitlines(), options)
     return imported_from_dlls
+
+#-------------------------------------------------------------------------------
+def get_imports(executables, options):
+    imports = {}
+    interesting_dll_names = get_basenames(executables)
+    print('Collecting the imports')
+    for exe in executables:
+        if options.verbose:
+            print(exe)
+        imports_from_dlls = get_import(exe, imports, interesting_dll_names,
+            options)
+        imports[os.path.basename(exe)] = imports_from_dlls
+
+    return imports
 
 #-------------------------------------------------------------------------------
 def get_basenames(inputs):
@@ -283,16 +306,8 @@ def main():
         print(f'No executables found in directory {root}')
         return 3
 
-    exports = {}
     print('Collecting the exports')
-    for exe in exes:
-        if options.unly_one and os.path.basename(exe) != options.unly_one:
-            if options.verbose:
-                print(f'Skipping {exe} because of -u {options.unly_one}')
-            continue
-        if options.verbose:
-            print(exe)
-        exports[exe] = get_exports(exe, options)
+    exports = get_exports(exes, options)
 
     if not len(exports):
         print(f'Got no exports - giving up')
@@ -300,16 +315,9 @@ def main():
     store_json_data(DEFAULT_EXP_OUTPUT, exports)
     print(f'  Saved as {DEFAULT_EXP_OUTPUT}')
 
-    # The go another round to insert the imports
-    imports = {}
-    interesting_dll_names = get_basenames(exes)
+    # Then go another round to insert the imports
     print('Collecting the imports')
-    for exe in exes:
-        if options.verbose:
-            print(exe)
-        imports_from_dlls = get_imports(exe, imports, interesting_dll_names, options)
-        imports[os.path.basename(exe)] = imports_from_dlls
-
+    imports = get_imports(exes, options)
     store_json_data(DEFAULT_IMP_OUTPUT, imports)
     print(f'  Saved as {DEFAULT_IMP_OUTPUT}')
     return 0

@@ -24,10 +24,10 @@ save unreferenced exported functions as {DEFAULT_UNREF_OUTPUT}
 USAGE_EXAMPLE = f"""
 Example:
 For just ASpecificDLL.dll
-> get_exports_imports.py -t ..\\..\\refdefs\\apps -u ASpecificDLL.dll
+> pe_get_exports_imports.py -t ..\\..\\refdefs\\apps -u ASpecificDLL.dll
 > {MY_NAME} -t .
 or for them all
-> get_exports_imports.py -t ..\\..\\refdefs\\apps
+> pe_get_exports_imports.py -t ..\\..\\refdefs\\apps
 > {MY_NAME} -t .
 
 """
