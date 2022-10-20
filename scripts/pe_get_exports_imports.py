@@ -35,6 +35,8 @@ def parse_arguments():
     add = parser.add_argument
     add('-d', '--debug_level', type=int, default=0, help='set debug level')
 
+    add('-f', '--filter', action='store_true',
+        help='exclude external dlls')
     add('-t', '--target_dir', metavar='bin_dir',
         required=True,
         help='root path to check (recursively)')
@@ -87,7 +89,7 @@ def get_import(file, interesting_dlls, options):
 
     for entry in import_directories:
         imported_dll = str(entry.dll.decode('utf8'))
-        if not imported_dll in interesting_dlls:
+        if options.filter and not imported_dll in interesting_dlls:
 #           print(f'  Skipping {imported_dll}')
             continue
 

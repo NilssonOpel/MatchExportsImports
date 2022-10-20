@@ -39,7 +39,8 @@ def parse_arguments():
     )
     add = parser.add_argument
     add('-d', '--debug_level', type=int, default=0, help='set debug level')
-
+    add('-f', '--filter', action='store_true',
+        help='exclude external dlls')
     add('-s', '--studio_dir', metavar='VS2022',
         default=MAGIC_PATH,
         help='Where your dumpbin.exe is located')
@@ -221,7 +222,7 @@ def parse_out_the_imports(the_exe, interesting_exes, the_input, options):
         # Take the name of the DLL that the_exe is importing from
         imported_dll = line[4:]
 
-        if imported_dll not in interesting_exes:
+        if options.filter and imported_dll not in interesting_exes:
 #            print(f'  Skipping {imported_dll}')
             curr_line = get_next_imported_dll(the_input, curr_line, no_of_lines)
             line = the_input[curr_line]
